@@ -1,1 +1,16 @@
-.DS_Store
+.DS_Stores
+venv/
+.env/
+.venv/
+env/
+**/venv/
+**/.venv/
+**/env/
+**/.env/
+**/ENV/
+**/.ENV/
+**/venv.bak/
+**/virtualenv/
+**/VirtualEnv/
+__pycache__/
+.ipynb_checkpoints/
