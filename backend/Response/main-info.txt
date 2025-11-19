@@ -3,9 +3,10 @@ Installs:
     install Node.js: brew install node 
         (if not on mac must install from google)
     activate venv: source venv/bin/activate
-    run: npm install react-router-dom @tanstack/react-query lucide-react
-    then: npx shadcn@latest init
-    then: npx shadcn@latest add button textarea toast sonner tooltip
+    run: curl -fsSL https://bun.sh/install | bash
+    fully quit and reopen terminal
+    cd frontend
+    then: bun install
 
 
 
