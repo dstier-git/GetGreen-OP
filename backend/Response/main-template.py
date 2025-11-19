@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from ... import ResponseGenerator
 
-# TODO: wrap your response file in a class named ResponseGenerator
+# TODO: wrap your function file in a class called Response Generator
+# TODO: RENAME your function file to have only letters or underscores
 # TODO: replace '...' after from above with 'from your_response_file' with NO .py after
 # this allows us to import our function into another file!
 
