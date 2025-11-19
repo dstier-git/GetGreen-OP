@@ -1,0 +1,20 @@
+Installs: 
+    cd to GetGreen-OP
+    install Node.js: brew install node 
+        (if not on mac must install from google)
+    activate venv: source venv/bin/activate
+    run: curl -fsSL https://bun.sh/install | bash
+    fully quit and reopen terminal
+    cd frontend
+    then: bun install
+
+
+
+
+
+
+Terminal function to start server:
+uvicorn your_filename:app --reload --port 8000
+
+Troubleshooting:
+    Module not installed error? run file from terminal instead with Python file_name (in the correct folder)
