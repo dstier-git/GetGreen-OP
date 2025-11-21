@@ -1,41 +1,30 @@
-from transformers import pipeline
-import torch, platform
+from llama_cpp import Llama
 
-model_id = "meta-llama/Llama-3.2-1B"
 
-# Auto device + dtype
-if torch.backends.mps.is_available():
-    device_map = "mps"
-    dtype = torch.float16
-    print("Running on Apple MPS with float16")
-elif torch.cuda.is_available():
-    device_map = "cuda"
-    dtype = torch.bfloat16
-    print("Running on CUDA GPU with bfloat16")
-else:
-    device_map = "cpu"
-    dtype = torch.bfloat16
-    print("Running on CPU (bfloat16)")
+model_path = r"C:\LLM\Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 
-slm = pipeline(
-    "text-generation",
-    model=model_id,
-    model_kwargs={"torch_dtype": dtype},
-    device_map=device_map
+
+slm = Llama(
+    model_path=model_path,
+    n_gpu_layers=0,
+    n_ctx=4096,
+    verbose=False,
+    cache=True
 )
 
 
 SYSTEM_PROMPT = """You are GetGreen.AI — a friendly, practical chatbot that helps people
 take small, realistic environmental actions every day.
 
+
 Tone: upbeat, supportive, and action-oriented.
 Focus areas: food, shopping, transportation, energy use, waste reduction.
-Keep answers short and encouraging — 1-3 sentences with clear suggestions.
+Keep answers short and encouraging. Try to keep it less than 5 sentences.  Avoid using lists if possible
+Do NOT include 'User:' or 'Assistant:' in your replies.
 """
 
-def create_few_shot(user_input):
-    FEW_SHOT_PROMPT = f"""{SYSTEM_PROMPT}
 
+EXAMPLES = """
 Examples:
 User: I'm going grocery shopping.
 Assistant: Don't forget reusable bags and local produce!
@@ -44,22 +33,61 @@ Assistant: Try a meatless recipe — good for you and the planet!
 User: I just filled out my sustainability interests.
 Assistant: Awesome! Want ideas that match your favorite eco-categories?
 ---
-Now respond in the same style.
-User: {user_input}
-Assistant:"""
-    return FEW_SHOT_PROMPT
+"""
 
-user_input = "What can I do this weekend to be more sustainable?"
-prompt = create_few_shot(user_input)
 
-result = slm(
-    prompt,
-    max_new_tokens=120,
-    temperature=0.6,
-    top_p=0.95,
-    do_sample=True
-)
+def build_prompt(history, first_turn):
+    convo = ""
+    for role, text in history:
+        convo += f"{role}: {text}\n"
 
-output = result[0]["generated_text"]
-assistant_reply = output.split("Assistant:")[-1].split("User:")[0].strip()
-print(assistant_reply)
+
+    if first_turn:
+        # first turn: system + examples + convo
+        return f"{SYSTEM_PROMPT}\n{EXAMPLES}{convo}Assistant: "
+    else:
+        # later turns: system + convo (no examples)
+        return f"{SYSTEM_PROMPT}\n{convo}Assistant: "
+
+
+history = []
+first_turn = True
+
+
+print("🌿 GetGreen.AI Chatbot (type 'exit' to quit)\n")
+
+
+while True:
+    user_input = input("You: ")
+    if user_input.lower().strip() == "exit":
+        break
+
+
+    history.append(("User", user_input))
+
+
+    prompt = build_prompt(history, first_turn)
+
+
+    result = slm(
+        prompt,
+        max_tokens=200,
+        temperature=0.6,
+        top_p=0.95,
+        repeat_penalty = 1.1,
+        stop=["User:", "\nUser:", "<|eot_id|>"],
+    )
+
+
+    raw = result["choices"][0]["text"]
+    assistant_response = raw.strip()
+
+
+    history.append(("Assistant", assistant_response))
+
+
+    first_turn = False
+
+
+    print("\nAssistant:", assistant_response, "\n")
+
