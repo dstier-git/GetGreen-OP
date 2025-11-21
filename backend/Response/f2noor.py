@@ -8,20 +8,19 @@ table_name = 'simplified_data'
 df = pd.read_csv(csv_file)
 conn = sqlite3.connect(db_file)
 
-df.to_sql("my_table", conn, if_exists='replace', index=False)
+df.to_sql(table_name, conn, if_exists='replace', index=False)  # Fixed table name
 conn.close()
 
+def function_alt(columns, user_id):
+    return function('data.db', 'simplified_data', columns, user_id)
 
 def function(db_file, table_name, columns, user_id):
-
-    col = columns[0]
-    for i in range(1, len(columns)):
-        col = col + f", {columns[i]}"
+    col = ", ".join(columns)  # Safer column list construction
     q = f"SELECT {col} FROM {table_name} WHERE user_id = ?;"
 
     conn = sqlite3.connect(db_file)
     cur = conn.cursor()
-    cur.execute(q, (user_id,))
+    cur.execute(q, (user_id,))  # Fixed: tuple parameter
     row = cur.fetchall()
 
     conn.close()
@@ -29,9 +28,3 @@ def function(db_file, table_name, columns, user_id):
 
     print(result)
     return result
-
-
-if __name__ == "__main__":
-    db_path = "data.db"
-    table = "my_table"
-    function(db_path, table, ["name", "score"], 42)

@@ -60,7 +60,7 @@ def generate_response(prompt, columns, user_id):
         # context comes BEFORE the prompt
         # remember to RETURN the output from the LLM
     
-    c = table_to_context(f2noor.function(user_id, columns))
+    c = table_to_context(f2noor.function_alt(user_id, columns))
     prompt2 = c + "\n\n" + prompt
     output = generator(
         prompt2,
