@@ -1,8 +1,33 @@
 from llama_cpp import Llama
-
+import pandas as pd
+from sentence_transformers import SentenceTransformer
+import faiss
+import os
 
 model_path = r"C:\LLM\Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+df = pd.read_csv("articles_cleaned_filtered.csv")
 
+
+documents = (
+    df["Title"].fillna("") + "\n\n" + df["scraped_text"].fillna("")
+).tolist()
+
+EMBED_DIM = 384    
+INDEX_PATH = "faiss_index.bin"
+EMBED_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+
+if os.path.exists(INDEX_PATH):
+    index = faiss.read_index(INDEX_PATH)
+else:
+    embeddings = EMBED_MODEL.encode(documents)
+    index = faiss.IndexFlatL2(EMBED_DIM)
+    index.add(embeddings)
+    faiss.write_index(index, INDEX_PATH)
+
+def retrieve_relevant_docs(query, k=2):
+    q_emb = EMBED_MODEL.encode([query])
+    D, I = index.search(q_emb, k)
+    return "\n\n".join(documents[idx] for idx in I[0] if idx < len(documents))
 
 slm = Llama(
     model_path=model_path,
@@ -20,7 +45,7 @@ Focus areas: food, shopping, transportation, energy use, waste reduction.
 Keep replies short (2–4 sentences), encouraging, and simple. Avoid lists unless necessary.
 Offer small, realistic tips — never extreme or guilt-inducing. 
 Do not give technical, medical, or legal advice.
-Ask a brief follow-up question when it helps keep the conversation going.
+Do not always ask a question at the end. Ask one brief follow-up question only when it helps keep the conversation going. 
 Do NOT include "User:" or "Assistant:" in your replies.
 """
 
@@ -45,22 +70,28 @@ Assistant: Sweet! Consider donating or reselling pieces you don’t wear. It kee
 """
 
 
-def build_prompt(history, first_turn):
+def build_prompt(history, context):
     convo = ""
     for role, text in history:
         convo += f"{role}: {text}\n"
 
+    return f"""
+{SYSTEM_PROMPT}
 
-    if first_turn:
-        # first turn: system + examples + convo
-        return f"{SYSTEM_PROMPT}\n{EXAMPLES}{convo}Assistant: "
-    else:
-        # later turns: system + convo (no examples)
-        return f"{SYSTEM_PROMPT}\n{convo}Assistant: "
+[Examples:]
+{EXAMPLES}
+
+[Relevant Information:]
+{context}
+
+[Conversation so far:]
+{convo}
+
+Assistant:"""
+
 
 
 history = []
-first_turn = True
 
 
 print("🌿 GetGreen.AI Chatbot (type 'exit' to quit)\n")
@@ -74,8 +105,8 @@ while True:
 
     history.append(("User", user_input))
 
-
-    prompt = build_prompt(history, first_turn)
+    retrieved = retrieve_relevant_docs(user_input)
+    prompt = build_prompt(history, context=retrieved)
 
 
     result = slm(
@@ -84,19 +115,16 @@ while True:
         temperature=0.6,
         top_p=0.95,
         repeat_penalty = 1.1,
-        stop=["User:", "\nUser:", "<|eot_id|>"],
+        stop=["\n\n", "User:", "\nUser:", "<|eot_id|>"],
     )
 
 
     raw = result["choices"][0]["text"]
-    assistant_response = raw.strip()
-
-
+    assistant_response = raw.strip().split("You are GetGreen.AI")[0].strip()
+    assistant_response = assistant_response.split("User:")[0].strip()
+    assistant_response = " ".join(assistant_response.split())
+    
     history.append(("Assistant", assistant_response))
-
-
-    first_turn = False
-
 
     print("\nAssistant:", assistant_response, "\n")
 
