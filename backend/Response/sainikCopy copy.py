@@ -2,7 +2,6 @@ from transformers import pipeline
 import torch
 import pandas as pd
 import funcTestSainik
-from vector_retriever import retrieve_relevant_docs
 
 # TODO: move your SQL (Python) file to this folder
 # import ...
@@ -65,12 +64,9 @@ class ResponseGenerator:
         
         # retrieve data from columns and show the columns and user_id
         data = funcTestSainik.get_columns(columns, user_id)
-        retrieved_docs = retrieve_relevant_docs(prompt)
         # turn the new table into NLP 
         context = table_to_context(data)
         # Context before prompt
-        if retrieved_docs:
-            context = f"{context}\n\nRelevant articles:\n{retrieved_docs}"
         full_prompt = f"{context}\n\n{prompt}"
         
         print("Generating output/data...\n\n")

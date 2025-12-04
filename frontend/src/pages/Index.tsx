@@ -83,7 +83,7 @@ const Index = () => {
           />
           <div>
             <h1 className="text-xl font-semibold text-foreground">Climate Assistant</h1>
-            <p className="text-xs text-muted-foreground">Your guide to environmental solutions</p>
+            <p className="text-xs text-muted-foreground">Sources actions and user data | Powered by Llama.</p>
           </div>
         </div>
       </header>
