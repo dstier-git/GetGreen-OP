@@ -16,3 +16,10 @@ __pycache__/
 .ipynb_checkpoints/
 .DS_Store
 anaconda_projects/db/
+
+# Sensitive / client-only data (keep public repo clean)
+data/articles_cleaned_filtered.csv
+data/data_with_stats.csv
+data/simplified_data.csv
+# FAISS index built from articles (regenerate with data in place)
+backend/Response/faiss_index.bin
