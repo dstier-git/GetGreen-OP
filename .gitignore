@@ -1,4 +1,29 @@
 .DS_Stores
+.DS_Store
+.DS_store
+
+# Logs
+*.log
+logs/
+
+# Dependency/build caches
+node_modules/
+frontend/node_modules/
+.vite/
+dist/
+build/
+
+# Local databases and caches
+*.db
+*.sqlite
+*.sqlite3
+anaconda_projects/db/
+**/anaconda_projects/db/
+
+# Python caches
+__pycache__/
+.ipynb_checkpoints/
+
 venv/
 .env/
 .venv/
@@ -12,11 +37,6 @@ env/
 **/venv.bak/
 **/virtualenv/
 **/VirtualEnv/
-__pycache__/
-.ipynb_checkpoints/
-.DS_Store
-anaconda_projects/db/
-
 # Sensitive / client-only data (keep public repo clean)
 data/articles_cleaned_filtered.csv
 data/data_with_stats.csv
