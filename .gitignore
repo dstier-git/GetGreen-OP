@@ -23,3 +23,11 @@ data/data_with_stats.csv
 data/simplified_data.csv
 # FAISS index built from articles (regenerate with data in place)
 backend/Response/faiss_index.bin
+# Other copies of user/activity data
+backend/Response/data_with_stats-copy.csv
+backend/Response/data_with_stats.db
+backend/Response/data.db
+backend/Response/simplified-data.csv
+backend/Response/simplified-data.db
+backend/SQLite-init/simplified-data.csv
+backend/SQLite-init/simplified-data.db
