@@ -1,7 +1,7 @@
 import requests
 import json
 import pandas as pd
-import funcTestSainik
+import data_retriever
 from vector_retriever import retrieve_relevant_docs
 
 # ----------------------------------------
@@ -92,7 +92,7 @@ class ResponseGenerator:
         
         # Get user-specific data
         print("[ResponseGenerator] Fetching user data from database...")
-        user_data = funcTestSainik.get_columns(columns, user_id)
+        user_data = data_retriever.get_columns(columns, user_id)
         print(f"[ResponseGenerator] User data rows returned: {len(user_data) if hasattr(user_data, '__len__') else 'unknown'}")
         user_context = table_to_context(user_data)
 

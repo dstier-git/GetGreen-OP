@@ -1,11 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sainikCopyLLAMA import ResponseGenerator
+from llama import ResponseGenerator
 
-# TODO: wrap your function file in a class called Response Generator
-# TODO: RENAME your function file to have only letters or underscores
-# TODO: replace '...' after from above with 'from your_response_file' with NO .py after
+# TODO: wrap your function file in a class called ResponseGenerator
 # this allows us to import our function into another file!
 
 
