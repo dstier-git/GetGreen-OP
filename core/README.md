@@ -1,59 +1,39 @@
-# GetGreen app & bot runtime
+# GetGreen app
 
-This folder contains only the code and data paths used when running the **app** (frontend + backend API) and **bot**. All other repo content (notebooks, tutorials, analysis, misc) stays in the repo root.
+## 1. Data
 
-## Run the app
+Put these in **`core/core_data/`**:
 
-### 1. Backend (API)
+- `articles_cleaned_filtered.csv` – article corpus
+- `data_with_stats-copy.csv` – user/stats source CSV
+- `data_with_stats.db` – sqlite database file (auto-created/updated by backend)
 
-From the repo root, in one terminal:
-
-```bash
-cd core/backend
-uvicorn response:app --reload --port 8000
-```
-
-Use your current Python (conda base, system, or a venv). If you have a venv at the repo root:
-
-```bash
-cd core/backend && source ../../venv/bin/activate && uvicorn response:app --reload --port 8000
-```
-
-### 2. Frontend
-
-In a second terminal:
-
-```bash
-cd core/frontend
-npm install   # first time only
-npm run dev
-```
-
-Frontend runs on port 8080 and talks to the backend at `http://localhost:8000`.
-
-### 3. Environment
-
-- Copy `core/.env.example` to `core/.env`.
-- Fill in `SUPABASE_URL` and `SUPABASE_KEY` if you use Supabase.
-
-### 4. Data files (required at runtime)
-
-Place these in **`core/data/`** (they are gitignored; do not commit):
-
-- `articles_cleaned_filtered.csv` – article corpus for the chat retriever.
-- `data_with_stats-copy.csv` and `data_with_stats.db` – user/stats data for the backend.
-
-**FAISS index:** After putting `articles.csv` in `core/data/`, build the index once:
+Then build the search index once:
 
 ```bash
 cd core/backend
 python vector_retriever.py
 ```
 
-This creates `faiss_index.bin` in `core/backend/`.
+## 2. Environment
 
-## Layout
+Copy `core/.env.example` to `core/.env`. Add Supabase/OpenAI keys if you use them.
 
-- `core/frontend/` – Vite/React UI.
-- `core/backend/` – FastAPI app (`response.py`) and its dependencies (llama, chatgpt, vector_retriever, data_retriever).
-- `core/data/` – Runtime data files (csv, db; FAISS index in `core/backend/`).
+## 3. Run
+
+**Terminal 1 – backend:**
+
+```bash
+cd core/backend
+uvicorn response:app --reload --port 8000
+```
+
+**Terminal 2 – frontend:**
+
+```bash
+cd core/frontend
+npm install
+npm run dev
+```
+
+Frontend: http://localhost:8080. Backend: http://localhost:8000.
