@@ -4,8 +4,8 @@ from pathlib import Path
 
 _BASE_DIR = Path(__file__).resolve().parent
 _CORE_DATA = _BASE_DIR.parent.parent / "data"
-csv_file = str(_CORE_DATA / "data_with_stats-copy.csv")
-db_file = str(_CORE_DATA / "data_with_stats.db")
+csv_file = str(_CORE_DATA / "user_stats.csv")
+db_file = str(_CORE_DATA / "user_stats.db")
 table_name = 'simplified'
 df = pd.read_csv(csv_file)
 conn = sqlite3.connect(db_file)

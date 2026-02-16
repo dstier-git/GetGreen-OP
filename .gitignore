@@ -53,8 +53,8 @@ backend/SQLite-init/simplified-data.csv
 backend/SQLite-init/simplified-data.db
 
 # Core app runtime data (same patterns under core/)
-core/data/articles_cleaned_filtered.csv
-core/data/data_with_stats-copy.csv
-core/data/data_with_stats.db
-core/backend/Response/faiss_index.bin
+core/data/articles.csv
+core/data/user_stats.csv
+core/data/user_stats.db
+core/backend/faiss_index.bin
 core/.env

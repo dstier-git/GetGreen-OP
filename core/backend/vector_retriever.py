@@ -9,7 +9,7 @@ from sentence_transformers import SentenceTransformer
 EMBED_DIM = 384
 MODEL_NAME = "all-MiniLM-L6-v2"
 BASE_DIR = Path(__file__).resolve().parent
-DATA_PATH = BASE_DIR.parent.parent / "data" / "articles_cleaned_filtered.csv"
+DATA_PATH = BASE_DIR.parent.parent / "data" / "articles.csv"
 INDEX_PATH = BASE_DIR / "faiss_index.bin"
 
 _documents = None
@@ -22,7 +22,7 @@ def build_index_once() -> None:
     """
     Build the FAISS index over the articles corpus *once*.
 
-    - Reads `articles_cleaned_filtered.csv`
+    - Reads `articles.csv`
     - Computes embeddings for all documents
     - Writes `faiss_index.bin`
     - Prints progress so you know when it's done
