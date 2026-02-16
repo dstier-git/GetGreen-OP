@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ChatMessage } from "@/components/ChatMessage";
 import { ChatInput } from "@/components/ChatInput";
+import { Button } from "@/components/ui/button";
 import climateLogo from "@/assets/climate-logo.png";
 
 interface Message {
@@ -18,6 +19,7 @@ const Index = () => {
     },
   ]);
   const [isTyping, setIsTyping] = useState(false);
+  const [provider, setProvider] = useState<"llama" | "chatgpt">("llama");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -44,7 +46,7 @@ const Index = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ message: content }),
+        body: JSON.stringify({ message: content, provider }),
       });
 
       if (!response.ok) {
@@ -83,7 +85,25 @@ const Index = () => {
           />
           <div>
             <h1 className="text-xl font-semibold text-foreground">Climate Assistant</h1>
-            <p className="text-xs text-muted-foreground">Sources actions and user data | Powered by Llama.</p>
+            <p className="text-xs text-muted-foreground">Sources actions and user data | Powered by {provider === "llama" ? "Llama" : "ChatGPT"}.</p>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={provider === "llama" ? "default" : "outline"}
+              onClick={() => setProvider("llama")}
+            >
+              Llama
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={provider === "chatgpt" ? "default" : "outline"}
+              onClick={() => setProvider("chatgpt")}
+            >
+              ChatGPT
+            </Button>
           </div>
         </div>
       </header>

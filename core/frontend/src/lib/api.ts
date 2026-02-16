@@ -22,13 +22,13 @@ export const getApiUrl = (endpoint: string): string => {
 /**
  * Send a chat message to the backend API
  */
-export const sendChatMessage = async (message: string): Promise<string> => {
+export const sendChatMessage = async (message: string, provider?: "llama" | "chatgpt"): Promise<string> => {
   const response = await fetch(getApiUrl(API_CONFIG.endpoints.chat), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, provider }),
   });
 
   if (!response.ok) {
@@ -38,4 +38,3 @@ export const sendChatMessage = async (message: string): Promise<string> => {
   const data = await response.json();
   return data.response;
 };
-

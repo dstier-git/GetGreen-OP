@@ -6,20 +6,22 @@ This folder contains only the code and data paths used when running the **app** 
 
 ### 1. Backend (API)
 
-From the **project root** (so `core/` is visible) or from `core/backend/Response`:
+From the repo root, in one terminal:
 
 ```bash
-cd core/backend/Response
-uvicorn mainTry:app --reload --port 8000
+cd core/backend
+uvicorn response:app --reload --port 8000
 ```
 
-Or from repo root:
+Use your current Python (conda base, system, or a venv). If you have a venv at the repo root:
 
 ```bash
-uvicorn mainTry:app --reload --port 8000 --app-dir core/backend/Response
+cd core/backend && source ../../venv/bin/activate && uvicorn response:app --reload --port 8000
 ```
 
 ### 2. Frontend
+
+In a second terminal:
 
 ```bash
 cd core/frontend
@@ -31,7 +33,7 @@ Frontend runs on port 8080 and talks to the backend at `http://localhost:8000`.
 
 ### 3. Environment
 
-- Copy `core/.env.example` to `core/.env` (or put `.env` in `core/backend/Response`).
+- Copy `core/.env.example` to `core/.env`.
 - Fill in `SUPABASE_URL` and `SUPABASE_KEY` if you use Supabase.
 
 ### 4. Data files (required at runtime)
@@ -41,17 +43,17 @@ Place these in **`core/data/`** (they are gitignored; do not commit):
 - `articles_cleaned_filtered.csv` – article corpus for the chat retriever.
 - `data_with_stats-copy.csv` and `data_with_stats.db` – user/stats data for the backend.
 
-**FAISS index:** After putting `articles_cleaned_filtered.csv` in `core/data/`, build the index once:
+**FAISS index:** After putting `articles.csv` in `core/data/`, build the index once:
 
 ```bash
-cd core/backend/Response
+cd core/backend
 python vector_retriever.py
 ```
 
-This creates `faiss_index.bin` in `core/backend/Response/`.
+This creates `faiss_index.bin` in `core/backend/`.
 
 ## Layout
 
 - `core/frontend/` – Vite/React UI.
-- `core/backend/Response/` – FastAPI app (`mainTry.py`) and its dependencies (response generator, vector retriever, DB helpers).
-- `core/data/` – Runtime data files (csv, db, and the built FAISS index lives in `Response/`).
+- `core/backend/` – FastAPI app (`response.py`) and its dependencies (llama, chatgpt, vector_retriever, data_retriever).
+- `core/data/` – Runtime data files (csv, db; FAISS index in `core/backend/`).
