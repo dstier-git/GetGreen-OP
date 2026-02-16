@@ -12,11 +12,16 @@ To add your changes:
 - Run: git push origin main ("Pushes" your changes to the repo for everyone)
 
 RUN THE MODEL + FRONTEND:
-pull 
-set up a llama model on your computer thru Ollama
-might have to install some JS stuff, check terminal errors
 
-once setup, run in 2 separate terminals both  starting from GetGreen-OP:
-cd backend/Response && source ../../venv/bin/activate && uvicorn mainTry:app --reload --port 8000
+The **app** (frontend + backend) lives in **`core/`**. Everything else in the repo (analysis, misc, nlp, backend tutorials, etc.) is for reference/artifacts.
 
-cd frontend && npm run dev
+1. Pull, set up Ollama with a Llama model, and install JS deps if needed.
+2. From GetGreen-OP, run in two terminals:
+
+   **Backend:**  
+   `cd core/backend/Response && source ../../../venv/bin/activate && uvicorn mainTry:app --reload --port 8000`
+
+   **Frontend:**  
+   `cd core/frontend && npm run dev`
+
+See **`core/README.md`** for data setup (core/data/, .env, FAISS index).

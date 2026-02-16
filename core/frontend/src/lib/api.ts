@@ -2,7 +2,7 @@
  * API Configuration
  * This file contains the API endpoint configuration for the backend server.
  * The backend server should be running on http://localhost:8000
- * Start it with: uvicorn mainTry:app --reload --port 8000
+ * Start it from core: cd core/backend/Response && uvicorn mainTry:app --reload --port 8000
  */
 
 export const API_CONFIG = {
