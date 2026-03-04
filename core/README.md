@@ -21,7 +21,7 @@ Copy `core/.env.example` to `core/.env`. Add Supabase/OpenAI keys if you use the
 
 ## 3. Run
 
-**Terminal 1 – backend:**
+**Terminal 1 – backend:** (uses only `core/backend` code)
 
 ```bash
 cd core/backend

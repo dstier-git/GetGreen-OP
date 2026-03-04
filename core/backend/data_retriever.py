@@ -13,11 +13,8 @@ df.to_sql(table_name, conn, if_exists='replace', index=False)
 
 
 def get_columns(columns, user_id):
-    String_col1 = ""
-    for i, cols in enumerate(columns):
-        String_col1 += cols
-        if i < len(columns) - 1:
-            String_col1 += ", "
-    queryUser = f"SELECT {String_col1} FROM {table_name} WHERE user_id = '{user_id}'"
+    String_col1 = ", ".join(columns)
+    # user_id in this table is a scrambled_id integer; compare without quotes
+    queryUser = f"SELECT {String_col1} FROM {table_name} WHERE user_id = {int(user_id)}"
     df_result = pd.read_sql_query(queryUser, conn)
     return df_result

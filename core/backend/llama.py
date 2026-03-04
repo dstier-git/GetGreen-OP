@@ -2,6 +2,7 @@ import requests
 import json
 import pandas as pd
 import data_retriever
+import user_retriever
 from vector_retriever import retrieve_relevant_docs
 
 # ----------------------------------------
@@ -17,16 +18,21 @@ OLLAMA_URL = "http://localhost:11434/api/generate"
 # end of setup
 # ----------------------------------------
 
-# System prompt from dylan-script.py
 SYSTEM_PROMPT = """You are GetGreen.AI — a friendly, practical chatbot that helps people take small, realistic environmental actions every day.
 
 Tone: upbeat, supportive, conversational, and action-oriented.
 Focus areas: food, shopping, transportation, energy use, waste reduction.
 Keep replies short (2–4 sentences), encouraging, and simple. Avoid lists unless necessary.
-Offer small, realistic tips — never extreme or guilt-inducing. 
+Offer small, realistic tips — never extreme or guilt-inducing.
 Do not give technical, medical, or legal advice.
-Do not always ask a question at the end. Ask one brief follow-up question only when it helps keep the conversation going. 
+Do not always ask a question at the end. Ask one brief follow-up question only when it helps keep the conversation going.
 Do NOT include "User:" or "Assistant:" in your replies.
+
+When recommending actions:
+- Only recommend actions from the [Suggested Actions] list provided in the prompt.
+- Personalize recommendations based on the user's completed actions and categories shown in [User Information].
+- For every action you recommend, you MUST include its source. If the action has a source URL listed, provide it. If it says "No source available.", state that explicitly: "No source available for this one."
+- Do not invent or omit source information.
 """
 
 # Examples from dylan-script.py
@@ -57,29 +63,26 @@ class ResponseGenerator:
         Generate a response combining:
         - Vector retrieval from articles (RAG)
         - User-specific data from database
-        - System prompt and examples from dylan-script.py
+        - Personalized user context with completed actions and article sources
+        - Pre-filtered action recommendations with source status
+        - System prompt and examples
         - Ollama model for text generation
-        
-        Args:
-            prompt: User's message/query
-            columns: List of column names to retrieve from user data
-            user_id: User ID for data retrieval
-            history: Optional list of (role, text) tuples for conversation history
         """
         print("\n[ResponseGenerator] ---- New query --------------------------------")
         print(f"[ResponseGenerator] Prompt: {prompt!r}")
         print(f"[ResponseGenerator] Columns requested: {columns}")
         print(f"[ResponseGenerator] User ID: {user_id}")
 
-        # Convert tabular data into natural-language context
+        # Convert tabular stats rows into natural-language text (supplemental)
         def table_to_context(data):
             df = pd.DataFrame(data)
             if df.empty:
-                return "No data found for this user."
-            out = ["Here is the relevant user information:"]
+                return ""
+            out = []
             for _, row in df.iterrows():
-                parts = [f"{col}: {row[col]}" for col in df.columns]
-                out.append(" • " + ", ".join(parts))
+                parts = [f"{col}: {row[col]}" for col in df.columns if pd.notna(row[col])]
+                if parts:
+                    out.append(" • " + ", ".join(parts))
             return "\n".join(out)
 
         # Retrieve relevant articles using vector search (RAG)
@@ -89,12 +92,22 @@ class ResponseGenerator:
             print("[ResponseGenerator] Articles context retrieved (non-empty).")
         else:
             print("[ResponseGenerator] No relevant articles found or empty context returned.")
-        
-        # Get user-specific data
-        print("[ResponseGenerator] Fetching user data from database...")
+
+        # Build rich personalized user context (profile + completed actions + article sources)
+        print("[ResponseGenerator] Building personalized user context...")
+        user_context = user_retriever.build_user_context(user_id)
+        print(f"[ResponseGenerator] User context built ({len(user_context)} chars).")
+
+        # Supplement with stats rows from data_with_stats if available
         user_data = data_retriever.get_columns(columns, user_id)
-        print(f"[ResponseGenerator] User data rows returned: {len(user_data) if hasattr(user_data, '__len__') else 'unknown'}")
-        user_context = table_to_context(user_data)
+        stats_context = table_to_context(user_data)
+        if stats_context:
+            user_context += "\n\nAdditional stats:\n" + stats_context
+
+        # Build recommendations list (filtered against user history, with source status)
+        print("[ResponseGenerator] Building action recommendations...")
+        recommendations_context = user_retriever.get_recommendations_context(user_id)
+        print(f"[ResponseGenerator] Recommendations built ({len(recommendations_context)} chars).")
 
         # Build conversation history string if provided
         convo = ""
@@ -102,26 +115,18 @@ class ResponseGenerator:
             for role, text in history:
                 convo += f"{role}: {text}\n"
         else:
-            # If no history, just show the current user message
             convo = f"User: {prompt}\n"
 
-        # Build the full prompt combining all contexts
-        full_prompt = f"""
-{SYSTEM_PROMPT}
-
-[Examples:]
-{EXAMPLES}
-
-[Relevant Articles:]
-{article_context if article_context else "No relevant articles found."}
-
-[User Information:]
-{user_context}
-
-[Conversation so far:]
-{convo}
-
-Assistant:"""
+        full_prompt = (
+            f"{SYSTEM_PROMPT}\n\n"
+            f"[Examples:]\n{EXAMPLES}\n\n"
+            f"[Relevant Articles:]\n"
+            f"{article_context if article_context else 'No relevant articles found.'}\n\n"
+            f"[User Information:]\n{user_context}\n\n"
+            f"[Suggested Actions:]\n{recommendations_context}\n\n"
+            f"[Conversation so far:]\n{convo}\n\n"
+            f"Assistant:"
+        )
 
         print("[ResponseGenerator] Starting generation with Ollama...")
 
@@ -134,7 +139,7 @@ Assistant:"""
                 "options": {
                     "temperature": 0.6,
                     "top_p": 0.95,
-                    "num_predict": 200,  # Increased to match dylan-script.py
+                    "num_predict": 200,
                     "repeat_penalty": 1.1,
                 },
             },
@@ -148,22 +153,10 @@ Assistant:"""
                     generated_text += token
                     print(token, end="", flush=True)
 
-        # Clean up the response (similar to dylan-script.py)
         assistant_response = generated_text.strip()
-        # Remove any unwanted prefixes or artifacts
         assistant_response = assistant_response.split("You are GetGreen.AI")[0].strip()
         assistant_response = assistant_response.split("User:")[0].strip()
         assistant_response = " ".join(assistant_response.split())
 
         print("\n[ResponseGenerator] Generation complete. Returning response.\n")
         return assistant_response
-
-# Example test call
-# Uncomment to verify (takes a moment on first load):
-# print(
-#     ResponseGenerator.generate_response(
-#         prompt="As you can see, popular actions with leaf_values include:",
-#         columns=["action_name", "leaf_value"],
-#         user_id="821ce161-3539-4b46-858a-437deb80e1b8",
-#     )
-# )

@@ -3,6 +3,7 @@ import { ChatMessage } from "@/components/ChatMessage";
 import { ChatInput } from "@/components/ChatInput";
 import { Button } from "@/components/ui/button";
 import climateLogo from "@/assets/climate-logo.png";
+import { sendChatMessage, API_CONFIG } from "@/lib/api";
 
 interface Message {
   id: string;
@@ -19,7 +20,7 @@ const Index = () => {
     },
   ]);
   const [isTyping, setIsTyping] = useState(false);
-  const [provider, setProvider] = useState<"llama" | "chatgpt">("llama");
+  const [provider, setProvider] = useState<"llama" | "chatgpt">("chatgpt");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -41,31 +42,26 @@ const Index = () => {
     setIsTyping(true);
 
     try {
-      const response = await fetch("http://localhost:8000/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ message: content, provider }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const responseText = await sendChatMessage(content, provider);
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.response,
+        content: responseText,
       };
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
+      // #region agent log
+      const err = error as Error;
+      fetch("http://127.0.0.1:7244/ingest/d0b8079a-06bd-45a0-8a12-196e313fff53", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "Index.tsx:handleSendMessage", message: "catch", data: { errorMessage: err?.message, errorName: err?.name }, timestamp: Date.now(), hypothesisId: "H1" }) }).catch(() => {});
+      // #endregion
       console.error("Error calling API:", error);
+      const errorContent =
+        (error as Error)?.message ||
+        `Sorry, I encountered an error. Please make sure the core backend is running at ${API_CONFIG.baseURL}.`;
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "Sorry, I encountered an error while processing your request. Please make sure the backend server is running on http://localhost:8000",
+        content: errorContent,
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {

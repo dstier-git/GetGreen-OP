@@ -1,30 +1,20 @@
-"""One-off: build articles.csv and user_stats.csv from moved CSVs. Run from repo root: python core/core_data/build_app_data.py"""
-import pandas as pd
-from pathlib import Path
+"""
+SUPERSEDED — this script previously generated articles.csv (with URLs as scraped_text,
+which was broken) and user_stats.csv (a duplicate of data_with_stats-copy.csv).
 
-CORE_DATA = Path(__file__).resolve().parent
+Both generated files have been replaced:
+  - articles.csv / articles_cleaned_filtered.csv  →  articles_with_actions.csv
+    Columns: Title, URL, action_ids, action_names, scraped_text
+    Source:  External-Links.csv (all action mappings) +
+             core/data/articles_cleaned_filtered.csv (real scraped text)
 
-# articles.csv: vector_retriever needs Title + scraped_text
-ext = pd.read_csv(CORE_DATA / "External-Links-Basic.csv")
-ext["scraped_text"] = ext.get("URL", "")
-ext[["Title", "scraped_text"]].to_csv(CORE_DATA / "articles.csv", index=False)
-print("Created articles.csv with", len(ext), "rows")
+  - user_stats.csv  →  use data_with_stats-copy.csv directly (same content)
 
-# user_stats.csv: data_retriever needs user_id; get_columns wants most_frequent_category, most_frequent_action, action_name, leaf_value
-df = pd.read_csv(CORE_DATA / "Data-Sample.csv")
-if "scrambled_id" in df.columns:
-    df = df.rename(columns={"scrambled_id": "user_id"})
-col_map = {}
-for c in df.columns:
-    if c == "properties.action_name":
-        col_map[c] = "action_name"
-    elif c == "properties.leaf_value":
-        col_map[c] = "leaf_value"
-    elif c == "properties.category":
-        col_map[c] = "most_frequent_category"
-df = df.rename(columns=col_map)
-for col in ["most_frequent_category", "most_frequent_action", "action_name", "leaf_value"]:
-    if col not in df.columns:
-        df[col] = ""
-df.to_csv(CORE_DATA / "user_stats.csv", index=False)
-print("Created user_stats.csv with", len(df), "rows")
+To rebuild the FAISS/NumPy embedding index for the RAG, run:
+  python core/backend/vector_retriever.py
+"""
+raise SystemExit(
+    "build_app_data.py is superseded. "
+    "The canonical article data is now articles_with_actions.csv. "
+    "See the docstring above for details."
+)

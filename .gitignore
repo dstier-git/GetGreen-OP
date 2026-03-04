@@ -41,6 +41,10 @@ env/
 data/articles_cleaned_filtered.csv
 data/data_with_stats.csv
 data/simplified_data.csv
+# Top-level data/ duplicates (canonical copies live in core/core_data/)
+data/Data-Sample.csv
+data/External-Links.csv
+data/External-Links-Basic.csv
 # FAISS index built from articles (regenerate with data in place)
 backend/Response/faiss_index.bin
 # Other copies of user/activity data
@@ -53,8 +57,11 @@ backend/SQLite-init/simplified-data.csv
 backend/SQLite-init/simplified-data.db
 
 # Core app runtime data (same patterns under core/)
-core/data/articles.csv
-core/data/user_stats.csv
-core/data/user_stats.db
+core/core_data/data_with_stats-copy.csv
+core/core_data/user_stats.db
+core/core_data/data_with_stats.db
 core/backend/faiss_index.bin
+core/backend/article_embeddings.npy
 core/.env
+# Backup folder (local safety copies, not tracked)
+core/core_data/_backup/

@@ -1,0 +1,19 @@
+# Core backend API and deps
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+
+# Data & DB
+pandas>=2.0.0
+numpy>=1.26.0,<2.0.0
+
+# LLM / RAG
+openai>=1.0.0
+requests>=2.31.0
+faiss-cpu>=1.7.4
+sentence-transformers>=2.2.0
+transformers>=4.41.0,<5.0.0
+
+# Optional (uncomment if using Supabase)
+# supabase>=2.0.0
