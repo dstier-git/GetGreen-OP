@@ -1,9 +1,15 @@
 from pathlib import Path
 import threading
+import os
 
 import numpy as np
 import pandas as pd
 # FAISS check and fallback implemented by Codex
+
+# Prevent transformers/sentence-transformers from importing TensorFlow on this
+# machine (TensorFlow emits AVX warnings and can hang startup here).
+os.environ.setdefault("TRANSFORMERS_NO_TF", "1")
+os.environ.setdefault("USE_TF", "0")
 
 
 try:
@@ -23,7 +29,7 @@ EMBED_DIM = 384
 MODEL_NAME = "all-MiniLM-L6-v2"
 BASE_DIR = Path(__file__).resolve().parent
 CORE_DATA_DIR = BASE_DIR.parent / "core_data"
-DATA_PATH = CORE_DATA_DIR / "articles_cleaned_filtered.csv"
+DATA_PATH = CORE_DATA_DIR / "articles_with_actions.csv"
 INDEX_PATH = BASE_DIR / "faiss_index.bin"
 EMBEDDINGS_PATH = BASE_DIR / "article_embeddings.npy"
 
@@ -34,11 +40,38 @@ _embed_model = None
 _lock = threading.Lock()
 
 
+def _build_documents(df: pd.DataFrame) -> list:
+    """Build searchable document strings from articles_with_actions.csv.
+
+    Each document includes the title, action IDs, action names, and scraped
+    text so that semantic search can find articles from any of those signals.
+    """
+    docs = []
+    for _, row in df.iterrows():
+        title = str(row.get("Title", "") or "").strip()
+        action_ids = str(row.get("action_ids", "") or "").strip()
+        action_names = str(row.get("action_names", "") or "").strip()
+        scraped_text = str(row.get("scraped_text", "") or "").strip()
+        url = str(row.get("URL", "") or "").strip()
+
+        parts = [f"Title: {title}"]
+        if action_ids:
+            parts.append(f"Action IDs: {action_ids}")
+        if action_names:
+            parts.append(f"Actions: {action_names}")
+        if url:
+            parts.append(f"URL: {url}")
+        if scraped_text:
+            parts.append(scraped_text)
+        docs.append("\n".join(parts))
+    return docs
+
+
 def build_index_once() -> None:
     """
     Build the FAISS index over the articles corpus *once*.
 
-    - Reads `articles_cleaned_filtered.csv`
+    - Reads `articles_with_actions.csv`
     - Computes embeddings for all documents
     - Writes `faiss_index.bin` when FAISS is installed
     - Writes `article_embeddings.npy` when FAISS is unavailable
@@ -56,9 +89,7 @@ def build_index_once() -> None:
         raise FileNotFoundError(f"[vector_retriever] Missing corpus CSV at {DATA_PATH}")
 
     df = pd.read_csv(DATA_PATH)
-    _documents = (
-        df["Title"].fillna("") + "\n\n" + df["scraped_text"].fillna("")
-    ).tolist()
+    _documents = _build_documents(df)
     print(f"[vector_retriever] Loaded {len(_documents)} documents.")
 
     if SentenceTransformer is None:
@@ -109,9 +140,7 @@ def _load_documents_and_index():
             raise FileNotFoundError(f"[vector_retriever] Missing corpus CSV at {DATA_PATH}")
 
         df = pd.read_csv(DATA_PATH)
-        _documents = (
-            df["Title"].fillna("") + "\n\n" + df["scraped_text"].fillna("")
-        ).tolist()
+        _documents = _build_documents(df)
 
         if _HAS_FAISS:
             if not INDEX_PATH.exists():
