@@ -1,6 +1,6 @@
-# GetGreen-OP
+# climate-companion
 
-GetGreen is a sustainability coaching assistant (“GiGi”) that combines **retrieval over an article corpus**, **personalized user context**, and **large language models** to answer questions and suggest realistic environmental actions.
+Climate Companion is a sustainability coaching assistant (“GiGi”) that combines **retrieval over an article corpus**, **personalized user context**, and **large language models** to answer questions and suggest realistic environmental actions.
 
 This repository holds the **core application**: a **FastAPI** backend (`core/backend`) and a **Vite + React + TypeScript** frontend (`core/frontend`). The backend can use **OpenAI** (`chatgpt` / `auto`) with a **local Llama** fallback via **Ollama**, or **Llama** only.
 
