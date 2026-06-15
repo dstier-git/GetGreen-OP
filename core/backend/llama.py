@@ -18,7 +18,7 @@ OLLAMA_URL = "http://localhost:11434/api/generate"
 # end of setup
 # ----------------------------------------
 
-SYSTEM_PROMPT = """You are GetGreen.AI — a friendly, practical chatbot that helps people take small, realistic environmental actions every day.
+SYSTEM_PROMPT = """You are GiGi from GetGreen.AI — a friendly, practical sustainability assistant that helps people take small, realistic environmental actions every day.
 
 Tone: upbeat, supportive, conversational, and action-oriented.
 Focus areas: food, shopping, transportation, energy use, waste reduction.
@@ -27,12 +27,13 @@ Offer small, realistic tips — never extreme or guilt-inducing.
 Do not give technical, medical, or legal advice.
 Do not always ask a question at the end. Ask one brief follow-up question only when it helps keep the conversation going.
 Do NOT include "User:" or "Assistant:" in your replies.
+Address the user as John when natural.
 
 When recommending actions:
 - Only recommend actions from the [Suggested Actions] list provided in the prompt.
 - Personalize recommendations based on the user's completed actions and categories shown in [User Information].
-- For every action you recommend, you MUST include its source. If the action has a source URL listed, provide it. If it says "No source available.", state that explicitly: "No source available for this one."
-- Do not invent or omit source information.
+- Sources are optional. Only reference a source when it adds meaningful metrics (like carbon/emissions numbers) or clear personal relevance for John's life.
+- Do not invent source information.
 """
 
 # Examples from dylan-script.py
@@ -159,4 +160,130 @@ class ResponseGenerator:
         assistant_response = " ".join(assistant_response.split())
 
         print("\n[ResponseGenerator] Generation complete. Returning response.\n")
+        return assistant_response
+
+    @staticmethod
+    def generate_response_compact(
+        prompt,
+        columns,
+        user_id,
+        history=None,
+        article_context=None,
+        user_context=None,
+        recommendations_context=None,
+        intent="general_qa",
+    ):
+        print("\n[ResponseGenerator] ---- Compact mode query -----------------------")
+        print(f"[ResponseGenerator] Intent: {intent}")
+
+        def table_to_context(data):
+            df = pd.DataFrame(data)
+            if df.empty:
+                return ""
+            out = []
+            for _, row in df.iterrows():
+                parts = [f"{col}: {row[col]}" for col in df.columns if pd.notna(row[col])]
+                if parts:
+                    out.append(" • " + ", ".join(parts))
+            return "\n".join(out)
+
+        if article_context is None:
+            article_context = retrieve_relevant_docs(prompt, k=2)
+        if user_context is None:
+            user_context = user_retriever.build_user_context(user_id)
+        if recommendations_context is None:
+            recommendations_context = user_retriever.get_recommendations_context(user_id)
+
+        user_data = data_retriever.get_columns(columns, user_id)
+        stats_context = table_to_context(user_data)
+        if stats_context:
+            user_context += "\n\nAdditional stats:\n" + stats_context
+
+        convo = ""
+        if history:
+            for role, text in history:
+                convo += f"{role}: {text}\n"
+        else:
+            convo = f"User: {prompt}\n"
+
+        intent_instruction = {
+            "compare": "Provide a practical comparison and choose the better option for this user's profile.",
+            "weekly_plan": "Answer like a short weekly-plan intro with realistic and repeatable behavior.",
+            "impact_explain": "Explain impact qualitatively using user profile and article evidence without numeric estimates.",
+            "recommend": "Recommend practical next steps based on user profile.",
+            "recycle_text": "Give conservative recycling guidance and mention uncertainty when needed.",
+        }.get(intent, "Give a concise practical answer tailored to this user.")
+
+        full_prompt = (
+            f"{SYSTEM_PROMPT}\n\n"
+            f"[Intent]\n{intent}\n"
+            f"[Instruction]\n{intent_instruction}\n\n"
+            f"[Relevant Articles]\n"
+            f"{article_context if article_context else 'No relevant articles found.'}\n\n"
+            f"[User Information]\n{user_context}\n\n"
+            f"[Suggested Actions]\n{recommendations_context}\n\n"
+            f"[Conversation so far]\n{convo}\n\n"
+            f"Return only a friendly direct answer in 2-4 sentences, plain text, no list, no labels. "
+            f"Do not repeat exact phrasing used in recent assistant turns.\n\n"
+            f"Assistant:"
+        )
+
+        with requests.post(
+            OLLAMA_URL,
+            json={
+                "model": MODEL_NAME,
+                "prompt": full_prompt,
+                "options": {
+                    "temperature": 0.6,
+                    "top_p": 0.95,
+                    "num_predict": 140,
+                    "repeat_penalty": 1.1,
+                },
+            },
+            stream=True,
+        ) as r:
+            generated_text = ""
+            for line in r.iter_lines():
+                if line:
+                    data = json.loads(line.decode("utf-8"))
+                    token = data.get("response", "")
+                    generated_text += token
+
+        assistant_response = generated_text.strip()
+        assistant_response = assistant_response.split("You are GetGreen.AI")[0].strip()
+        assistant_response = assistant_response.split("User:")[0].strip()
+        assistant_response = " ".join(assistant_response.split())
+        return assistant_response
+
+    @staticmethod
+    def generate_welcome(instruction: str):
+        full_prompt = (
+            f"{SYSTEM_PROMPT}\n\n"
+            f"{instruction}\n\n"
+            f"Assistant:"
+        )
+        with requests.post(
+            OLLAMA_URL,
+            json={
+                "model": MODEL_NAME,
+                "prompt": full_prompt,
+                "options": {
+                    "temperature": 0.6,
+                    "top_p": 0.95,
+                    "num_predict": 140,
+                    "repeat_penalty": 1.1,
+                },
+            },
+            stream=True,
+        ) as r:
+            generated_text = ""
+            for line in r.iter_lines():
+                if line:
+                    data = json.loads(line.decode("utf-8"))
+                    token = data.get("response", "")
+                    generated_text += token
+
+        assistant_response = generated_text.strip()
+        assistant_response = assistant_response.split("User:")[0].strip()
+        assistant_response = " ".join(assistant_response.split())
         return assistant_response

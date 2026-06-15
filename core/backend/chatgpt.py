@@ -96,6 +96,8 @@ def generate_response_chatgpt(prompt, columns, user_id, history=None):
         f"[User Information:]\n{personalized_context}\n\n"
         f"[Suggested Actions:]\n{recommendations_context}\n\n"
         f"[Conversation so far:]\n{convo}\n\n"
+        f"Respond with only a concise direct answer in 1-2 sentences. "
+        f"Do not list actions or sources and do not add labels.\n\n"
         f"Assistant:"
     )
 
@@ -136,3 +138,97 @@ def generate_response_chatgpt(prompt, columns, user_id, history=None):
 
     print("\n[ChatGPT] Generation complete. Returning response.\n")
     return assistant_response
+
+
+def generate_response_chatgpt_compact(
+    prompt,
+    columns,
+    user_id,
+    history=None,
+    article_context=None,
+    user_context=None,
+    recommendations_context=None,
+    intent="general_qa",
+):
+    print("\n[ChatGPT] ---- Compact mode query ----------------------------")
+    print(f"[ChatGPT] Intent: {intent}")
+    if article_context is None:
+        article_context = retrieve_relevant_docs(prompt, k=2)
+    if user_context is None:
+        user_context = user_retriever.build_user_context(user_id)
+    if recommendations_context is None:
+        recommendations_context = user_retriever.get_recommendations_context(user_id)
+
+    user_data = data_retriever.get_columns(columns, user_id)
+    if isinstance(user_data, pd.DataFrame) and not user_data.empty:
+        stats_line = ", ".join(
+            f"{col}: {user_data.iloc[0][col]}"
+            for col in user_data.columns
+            if pd.notna(user_data.iloc[0][col])
+        )
+        if stats_line:
+            user_context += f"\nAdditional stats: {stats_line}"
+
+    convo = ""
+    if history:
+        for role, text in history:
+            convo += f"{role}: {text}\n"
+    else:
+        convo = f"User: {prompt}\n"
+
+    intent_instruction = {
+        "compare": "Provide a practical comparison and pick the better option for this user's profile.",
+        "weekly_plan": "Answer like a short weekly-plan intro with realistic, repeatable behavior.",
+        "impact_explain": "Explain impact qualitatively using user profile and article evidence without numeric estimates.",
+        "recommend": "Recommend practical next steps based on user profile.",
+        "recycle_text": "Give conservative recycling guidance and mention uncertainty when needed.",
+    }.get(intent, "Give a concise practical answer tailored to this user.")
+
+    full_prompt = (
+        f"{SYSTEM_PROMPT}\n\n"
+        f"[Intent]\n{intent}\n"
+        f"[Instruction]\n{intent_instruction}\n\n"
+        f"[Relevant Articles]\n{article_context or 'No relevant articles found.'}\n\n"
+        f"[User Information]\n{user_context}\n\n"
+        f"[Suggested Actions]\n{recommendations_context}\n\n"
+        f"[Conversation so far]\n{convo}\n\n"
+        f"Return only a friendly direct answer in 2-4 sentences, plain text, no list, no labels. "
+        f"Do not repeat exact phrasing used in recent assistant turns."
+    )
+
+    client = _get_openai_client()
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": full_prompt},
+        ],
+    )
+
+    raw = ""
+    if response.choices and len(response.choices) > 0 and getattr(response.choices[0].message, "content", None):
+        raw = response.choices[0].message.content
+    assistant_response = raw.strip() if raw else ""
+    assistant_response = assistant_response.split("User:")[0].strip()
+    assistant_response = " ".join(assistant_response.split())
+    return assistant_response
+
+
+def generate_welcome_chatgpt(instruction: str) -> str:
+    client = _get_openai_client()
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": instruction},
+        ],
+    )
+    raw = ""
+    if response.choices and len(response.choices) > 0 and getattr(response.choices[0].message, "content", None):
+        raw = response.choices[0].message.content
+    output = raw.strip() if raw else ""
+    output = output.split("User:")[0].strip()
+    output = " ".join(output.split())
+    return output

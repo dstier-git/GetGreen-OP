@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { ChatMessage } from "@/components/ChatMessage";
 import { ChatInput } from "@/components/ChatInput";
 import { Button } from "@/components/ui/button";
-import climateLogo from "@/assets/climate-logo.png";
-import { sendChatMessage, API_CONFIG } from "@/lib/api";
+import getGreenLogo from "@/assets/getgreen-logo.png";
+import { sendChatMessage, fetchWelcomeMessage, API_CONFIG } from "@/lib/api";
 
 interface Message {
   id: string;
@@ -11,14 +11,13 @@ interface Message {
   content: string;
 }
 
+const POC_USER_ID = 3421;
+const MAX_HISTORY_TURNS = 16;
+const DEFAULT_WELCOME =
+  "Hi John — I’m GiGi, your personal sustainability assistant. I can see you’ve been doing great work on practical eco actions. You seem to like realistic changes, and you might be interested in trying one new low-effort step this week.";
+
 const Index = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      role: "assistant",
-      content: "Hello! I'm your Climate Assistant. I'm here to help you understand climate change, explore sustainable solutions, and answer your environmental questions. What would you like to know?",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [provider, setProvider] = useState<"llama" | "chatgpt">("chatgpt");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -31,6 +30,46 @@ const Index = () => {
     scrollToBottom();
   }, [messages, isTyping]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadWelcome = async () => {
+      setIsTyping(true);
+      try {
+        const welcomeText = await fetchWelcomeMessage({
+          userId: POC_USER_ID,
+          provider: "chatgpt",
+        });
+        if (!cancelled) {
+          setMessages([
+            {
+              id: "welcome",
+              role: "assistant",
+              content: welcomeText,
+            },
+          ]);
+        }
+      } catch {
+        if (!cancelled) {
+          setMessages([
+            {
+              id: "welcome-fallback",
+              role: "assistant",
+              content: DEFAULT_WELCOME,
+            },
+          ]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsTyping(false);
+        }
+      }
+    };
+    loadWelcome();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleSendMessage = async (content: string) => {
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -42,7 +81,13 @@ const Index = () => {
     setIsTyping(true);
 
     try {
-      const responseText = await sendChatMessage(content, provider);
+      const history = [...messages, userMessage]
+        .slice(-MAX_HISTORY_TURNS)
+        .map(({ role, content }) => ({ role, content }));
+      const responseText = await sendChatMessage(content, provider, {
+        history,
+        userId: POC_USER_ID,
+      });
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
@@ -75,8 +120,8 @@ const Index = () => {
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
           <img 
-            src={climateLogo} 
-            alt="Climate Assistant Logo" 
+            src={getGreenLogo} 
+            alt="GetGreen Logo" 
             className="w-10 h-10 object-cover"
           />
           <div>

@@ -7,6 +7,7 @@ CURRENT_USER_ID is hardcoded here. Swap this value to change the active user.
 import functools
 import pandas as pd
 from pathlib import Path
+from typing import List, Dict, Any
 
 # ---- Active user ----
 CURRENT_USER_ID = 3421
@@ -149,10 +150,11 @@ def get_recommendations_context(user_id=None, n=10):
 
     Selection logic:
     - Excludes actions the user has already completed.
+    - Includes only actions that have a linked source URL.
     - Prioritises actions whose category matches the user's completed-action
-      categories, with sources-available entries ranked first.
+      categories.
     - Fills remaining slots with source-available actions from other categories.
-    Each entry explicitly states its source URL or "No source available."
+    Each entry includes source title and source URL.
     """
     if user_id is None:
         user_id = CURRENT_USER_ID
@@ -168,24 +170,24 @@ def get_recommendations_context(user_id=None, n=10):
     catalog = _load_action_catalog()
 
     # Bucket candidates
-    pri1, pri2, pri3 = [], [], []  # cat+source, cat-only, other+source
+    pri1, pri2 = [], []  # cat+source, other+source
     for aid, info in catalog.items():
         if aid in completed_ids:
             continue
         in_user_cat = info.get("category") in user_categories
         has_source = info.get("source") is not None
-        if in_user_cat and has_source:
+        if not has_source:
+            continue
+        if in_user_cat:
             pri1.append((aid, info))
-        elif in_user_cat:
+        else:
             pri2.append((aid, info))
-        elif has_source:
-            pri3.append((aid, info))
 
     # Roughly 60 % from user's categories, 40 % variety
-    n_cat = min(round(n * 0.6), len(pri1) + len(pri2))
+    n_cat = min(round(n * 0.6), len(pri1))
     n_other = n - n_cat
-    from_cat = (pri1 + pri2)[:n_cat]
-    from_other = pri3[:n_other]
+    from_cat = pri1[:n_cat]
+    from_other = pri2[:n_other]
     selected = (from_cat + from_other)[:n]
 
     if not selected:
@@ -196,11 +198,7 @@ def get_recommendations_context(user_id=None, n=10):
     ]
     for aid, info in selected:
         source = info.get("source")
-        source_str = (
-            f"Source: {source['title']} — {source['url']}"
-            if source
-            else "No source available."
-        )
+        source_str = f"Source: {source['title']} — {source['url']}"
         lines.append(
             f"  • [{aid}] {info['action_name']}"
             f" | category: {info.get('category', 'General')}"
@@ -209,6 +207,178 @@ def get_recommendations_context(user_id=None, n=10):
         )
 
     return "\n".join(lines)
+
+
+def _effort_rank(value):
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return 99
+    key = str(value).strip().lower()
+    mapping = {
+        "low": 0,
+        "easy": 0,
+        "medium": 1,
+        "moderate": 1,
+        "high": 2,
+        "hard": 2,
+    }
+    return mapping.get(key, 3)
+
+
+def _safe_float(value):
+    try:
+        if value is None or (isinstance(value, float) and pd.isna(value)):
+            return None
+        return float(value)
+    except Exception:
+        return None
+
+
+def get_recommendation_candidates(user_id=None, n=20) -> List[Dict[str, Any]]:
+    """
+    Return structured recommendation candidates for this user.
+
+    Ranking priority (for source-backed actions only):
+    1) Categories frequently completed by the user
+    2) Lower effort actions
+    """
+    if user_id is None:
+        user_id = CURRENT_USER_ID
+
+    completed = get_user_actions(user_id)
+    completed_ids = set(completed["action_id"].astype(str).tolist()) if not completed.empty else set()
+
+    category_counts = {}
+    if not completed.empty and "category" in completed.columns:
+        category_counts = (
+            completed["category"]
+            .fillna("General")
+            .astype(str)
+            .value_counts()
+            .to_dict()
+        )
+
+    catalog = _load_action_catalog()
+    ds = pd.read_csv(_DATA_SAMPLE_PATH, low_memory=False)
+    leaf_lookup = (
+        ds[ds["properties.action_id"].notna()][["properties.action_id", "properties.leaf_value"]]
+        .copy()
+    )
+    leaf_lookup["properties.action_id"] = leaf_lookup["properties.action_id"].astype(str).str.strip()
+    leaf_lookup["properties.leaf_value"] = pd.to_numeric(leaf_lookup["properties.leaf_value"], errors="coerce")
+    leaf_map = (
+        leaf_lookup.groupby("properties.action_id")["properties.leaf_value"]
+        .median()
+        .dropna()
+        .to_dict()
+    )
+
+    candidates = []
+    for aid, info in catalog.items():
+        action_id = str(aid).strip()
+        if action_id in completed_ids:
+            continue
+        category = info.get("category") or "General"
+        source = info.get("source") or {}
+        source_url = source.get("url")
+        source_title = source.get("title")
+        if not source_url:
+            continue
+        leaf_value = _safe_float(leaf_map.get(action_id))
+        category_score = int(category_counts.get(category, 0))
+        candidates.append(
+            {
+                "action_id": action_id,
+                "action_name": info.get("action_name"),
+                "category": category,
+                "effort_level": info.get("effort_level") or "Unknown",
+                "leaf_value": leaf_value,
+                "source_title": source_title,
+                "source_url": source_url,
+                "_rank": (
+                    -category_score,
+                    _effort_rank(info.get("effort_level")),
+                    action_id,
+                ),
+            }
+        )
+
+    candidates.sort(key=lambda item: item["_rank"])
+    trimmed = candidates[: max(1, n)]
+    for item in trimmed:
+        item.pop("_rank", None)
+    return trimmed
+
+
+def recommendation_candidates_to_context(candidates: List[Dict[str, Any]], limit: int = 10) -> str:
+    if not candidates:
+        return "No suggested actions available."
+
+    lines = ["Suggested actions for this user (ranked profile-forward):"]
+    for item in candidates[: max(1, limit)]:
+        source_url = item.get("source_url")
+        if not source_url:
+            continue
+        leaf = item.get("leaf_value")
+        leaf_text = f"{leaf:.2f}" if isinstance(leaf, (float, int)) else "N/A"
+        source_title = item.get("source_title")
+        source_str = f"Source: {source_title} — {source_url}"
+        lines.append(
+            f"  • [{item.get('action_id')}] {item.get('action_name')}"
+            f" | category: {item.get('category', 'General')}"
+            f" | effort: {item.get('effort_level', 'Unknown')}"
+            f" | leaf_value: {leaf_text}"
+            f" | {source_str}"
+        )
+    if len(lines) == 1:
+        return "No suggested actions available."
+    return "\n".join(lines)
+
+
+def build_welcome_profile_summary(user_id=None) -> Dict[str, str]:
+    """
+    Build a compact, user-facing summary for first-message personalization.
+    """
+    if user_id is None:
+        user_id = CURRENT_USER_ID
+
+    profile = get_user_profile(user_id) or {}
+    actions = get_user_actions(user_id)
+    candidates = get_recommendation_candidates(user_id=user_id, n=1)
+
+    top_category = str(profile.get("most_frequent_category") or "").strip()
+    top_action_name = str(profile.get("most_frequent_action_name") or "").strip()
+
+    if not top_category and not actions.empty and "category" in actions.columns:
+        category_counts = actions["category"].dropna().astype(str).value_counts()
+        if not category_counts.empty:
+            top_category = category_counts.index[0]
+
+    if not top_action_name and not actions.empty and "action_name" in actions.columns:
+        non_empty = actions["action_name"].dropna().astype(str)
+        if not non_empty.empty:
+            top_action_name = non_empty.iloc[0]
+
+    interest_suggestion = ""
+    if candidates:
+        interest_suggestion = str(candidates[0].get("action_name") or "").strip()
+
+    recent_style_hint = ""
+    if not actions.empty and "effort_level" in actions.columns:
+        effort = actions["effort_level"].dropna().astype(str).str.lower()
+        if not effort.empty:
+            if any(x in {"low", "easy"} for x in effort.head(20).tolist()):
+                recent_style_hint = "quick wins"
+            elif any(x in {"high", "hard"} for x in effort.head(20).tolist()):
+                recent_style_hint = "deeper habit changes"
+            else:
+                recent_style_hint = "balanced improvements"
+
+    return {
+        "top_category": top_category or "everyday sustainability",
+        "top_action_name": top_action_name or "small daily eco-actions",
+        "interest_suggestion": interest_suggestion or "a simple low-effort action this week",
+        "recent_style_hint": recent_style_hint or "practical steps",
+    }
 
 
 def build_user_context(user_id=None):
